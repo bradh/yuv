@@ -14,6 +14,7 @@ public class Y4mReader {
     private int frameRateDenominator;
     private InterlacingMode interlacing;
     private PixelAspectRatio pixelAspectRatio;
+    private ColourSpace colourSpace = ColourSpace.YUV420;
 
     public Y4mReader(SeekableByteChannel channel) {
         this.channel = channel;
@@ -39,7 +40,7 @@ public class Y4mReader {
         }
         channel.position(firstFrameHeaderOffset + 1);
     }
-    
+
     public byte[] getFrame() throws IOException {
         long startPosition = channel.position();
         int frameSizeBytes = getFrameSizeBytes();
@@ -66,7 +67,7 @@ public class Y4mReader {
         return frameRateNumerator;
     }
 
-    int getFrameRateDenominator() {
+    public int getFrameRateDenominator() {
         return frameRateDenominator;
     }
 
@@ -76,6 +77,10 @@ public class Y4mReader {
 
     public PixelAspectRatio getPixelAspectRatio() {
         return pixelAspectRatio;
+    }
+
+    public ColourSpace getColourSpace() {
+        return colourSpace;
     }
 
     private int findNextNewline(ByteBuffer bb) {
@@ -97,6 +102,9 @@ public class Y4mReader {
         switch (firstChar) {
             case 'A':
                 this.pixelAspectRatio = PixelAspectRatio.lookup(value);
+                break;
+            case 'C':
+                this.colourSpace = ColourSpace.lookup(value);
                 break;
             case 'F':
                 String[] rationalParts = value.split(":");
@@ -121,11 +129,20 @@ public class Y4mReader {
     }
 
     private int getFrameSizeBytes() {
-        // TODO: handle cases where it isn't 420
-        return frameWidth * frameHeight * 3 / 2;
+        switch (this.colourSpace) {
+            case YUV420:
+                return frameWidth * frameHeight * 3 / 2;
+            case YUV422:
+                return frameWidth * frameHeight * 2;
+            case YUV444:
+                return frameWidth * frameHeight * 3;
+            case UNKNOWN:
+            default:
+                throw new AssertionError(this.colourSpace.name());
+        }
     }
 
-    boolean hasMoreFrames() throws IOException {
+    public boolean hasMoreFrames() throws IOException {
         return channel.position() < channel.size();
     }
 
